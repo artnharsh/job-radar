@@ -1,7 +1,6 @@
 /**
- * Axios base instance.
- * All API calls go through this — base URL from env, 
- * auto JSON headers, centralised error interceptor.
+ * Axios base instance + all API calls.
+ * Sources section added in Day 3.
  */
 
 import axios from "axios";
@@ -9,10 +8,9 @@ import axios from "axios";
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "http://localhost:8000",
   headers: { "Content-Type": "application/json" },
-  timeout: 10000,
+  timeout: 15000,
 });
 
-// Response interceptor — log errors in dev
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -22,5 +20,22 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+// ── Jobs ──────────────────────────────────────────────────────────
+export const jobsApi = {
+  list: (params = {}) => api.get("/jobs/", { params }),
+  get:  (id)          => api.get(`/jobs/${id}`),
+};
+
+// ── Sources ───────────────────────────────────────────────────────
+export const sourcesApi = {
+  list:       ()               => api.get("/sources/"),
+  health:     ()               => api.get("/sources/health"),
+  tiers:      ()               => api.get("/sources/tiers"),
+  select:     (source_id, is_enabled) =>
+                api.post("/sources/select", { source_id, is_enabled }),
+  setMode:    (mode, source_ids = []) =>
+                api.post("/sources/mode", { mode, source_ids }),
+};
 
 export default api;

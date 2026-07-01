@@ -80,8 +80,32 @@ async def main() -> None:
     async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with async_session() as session:
         await seed(session)
+        await seed_default_user(session) 
     await engine.dispose()
 
+async def seed_default_user(session: AsyncSession) -> None:
+    """
+    Create the default user used in Day 3-5 before auth is wired.
+    UUID is stable: 00000000-0000-0000-0000-000000000001
+    """
+    from app.database.models import User
+    from app.services.source_selector_service import DEFAULT_USER_ID
+
+    stmt = (
+        insert(User)
+        .values(
+            id=DEFAULT_USER_ID,
+            name="Default User",
+            email="default@jobradar.local",
+            hashed_password="not-set",  # no auth yet
+            telegram_id=None,
+            is_active=True,
+        )
+        .on_conflict_do_nothing(index_elements=["email"])
+    )
+    await session.execute(stmt)
+    await session.commit()
+    log.info("default_user_seeded", user_id=str(DEFAULT_USER_ID))
 
 if __name__ == "__main__":
     asyncio.run(main())

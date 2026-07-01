@@ -22,8 +22,12 @@ class SourceHealthRead(BaseModel):
     error_message: str | None
     consecutive_failures: int
 
+    source_name: str | None = None
+    tier: int | None = None
+
     model_config = {"from_attributes": True}
 
 
 class SourceWithHealth(SourceRead):
+    is_enabled: bool = True   
     health: SourceHealthRead | None = None

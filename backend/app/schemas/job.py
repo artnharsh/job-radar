@@ -1,6 +1,6 @@
 from datetime import datetime
 from uuid import UUID
-from pydantic import BaseModel, HttpUrl, field_validator
+from pydantic import BaseModel
 
 
 class JobBase(BaseModel):
@@ -9,8 +9,8 @@ class JobBase(BaseModel):
     location: str | None = None
     url: str
     description: str | None = None
-    source_name: str
-    source_type: str
+    source_name: str = ""          # set by ingestion service, not collectors
+    source_type: str = "api"
     job_type: str | None = None
     experience_level: str | None = None
     salary_min: int | None = None
@@ -21,7 +21,7 @@ class JobBase(BaseModel):
 
 
 class JobCreate(JobBase):
-    job_hash: str
+    job_hash: str = ""             # computed if empty
     trust_score: float = 0.5
     posted_at: datetime | None = None
 

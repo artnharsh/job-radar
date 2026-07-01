@@ -1,13 +1,4 @@
-"""
-FastAPI application entry point.
-
-Startup sequence:
-  1. Logging configured
-  2. CORS middleware attached
-  3. Routers registered
-  4. Redis connection verified on startup event
-"""
-
+import asyncio
 from contextlib import asynccontextmanager
 
 import redis.asyncio as aioredis
@@ -15,6 +6,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import health
+from app.api import jobs
+from app.api import source
+from app.scheduler.job_scheduler import (
+    start_scheduler,
+    run_tier1_collectors,
+    run_grey_collectors,
+)
 from app.utils.config import settings
 from app.utils.logger import get_logger, setup_logging
 
@@ -24,10 +22,8 @@ log = get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # ── Startup ───────────────────────────────────────────────────
     log.info("startup", env=settings.app_env, version=settings.app_version)
 
-    # Verify Redis is reachable
     try:
         r = aioredis.from_url(settings.redis_url, decode_responses=True)
         await r.ping()
@@ -36,9 +32,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         log.error("redis_connection_failed", error=str(e))
 
-    yield
+    start_scheduler()
 
-    # ── Shutdown ──────────────────────────────────────────────────
+    # Fire initial collection immediately without blocking startup
+    asyncio.create_task(run_tier1_collectors())
+    asyncio.create_task(run_grey_collectors())
+    log.info("initial_collection_triggered")
+
+    yield
     log.info("shutdown")
 
 
@@ -50,7 +51,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# ── CORS ──────────────────────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
@@ -59,13 +59,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(health.router)
-
-# Day 2+ routers registered here as they're built:
-# app.include_router(jobs.router)
-# app.include_router(users.router)
-# app.include_router(sources.router)
+app.include_router(jobs.router)
+app.include_router(health.router)
+app.include_router(jobs.router)
+app.include_router(source.router)
 
 
 @app.get("/")
