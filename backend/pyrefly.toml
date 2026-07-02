@@ -1,0 +1,49 @@
+# Pyrefly configuration for JobRadar AI backend
+#
+# WHY THIS FILE EXISTS:
+#   This project runs entirely inside Docker. All packages (fastapi, sqlalchemy,
+#   pydantic, etc.) are installed inside the container via requirements.txt.
+#   On the host machine, the system Python 3.14 has none of these packages,
+#   so Pyrefly reports false "Cannot find module" errors for every import.
+#
+#   This config suppresses those false positives while keeping real type errors
+#   (wrong types, missing attributes, etc.) fully reported.
+
+# Tell Pyrefly to treat all unresolvable third-party imports as `Any`
+# instead of reporting an error. The wildcard covers all packages.
+ignore-missing-imports = [
+    "fastapi",
+    "fastapi.*",
+    "sqlalchemy",
+    "sqlalchemy.*",
+    "pydantic",
+    "pydantic.*",
+    "pydantic_settings",
+    "pydantic_settings.*",
+    "redis",
+    "redis.*",
+    "httpx",
+    "httpx.*",
+    "aiohttp",
+    "aiohttp.*",
+    "apscheduler",
+    "apscheduler.*",
+    "passlib",
+    "passlib.*",
+    "jose",
+    "jose.*",
+    "bs4",
+    "bs4.*",
+    "lxml",
+    "lxml.*",
+    "telegram",
+    "telegram.*",
+    "structlog",
+    "structlog.*",
+    "alembic",
+    "alembic.*",
+    "asyncpg",
+    "asyncpg.*",
+    "uvicorn",
+    "uvicorn.*",
+]

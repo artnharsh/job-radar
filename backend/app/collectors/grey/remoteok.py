@@ -1,12 +1,10 @@
 """
 RemoteOK collector.
-
 RemoteOK provides a public JSON API endpoint.
-Technically grey zone but has the least friction of all grey sources.
+Fix: explicitly handle gzip decompression via httpx.
 """
 
 from datetime import datetime, timezone
-
 from app.collectors.base import BaseCollector
 from app.schemas.job import JobCreate
 from app.utils.hashing import make_job_hash
@@ -20,19 +18,27 @@ class RemoteOKCollector(BaseCollector):
     async def collect(self) -> list[JobCreate]:
         jobs: list[JobCreate] = []
 
-        async with self.get_client() as client:
+        # RemoteOK requires Accept-Encoding to handle decompression
+        async with self.get_client(extra_headers={
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip, deflate, br",
+        }) as client:
             resp = await client.get(self.URL)
             resp.raise_for_status()
-            data = resp.json()
 
-            # First item is a legal notice dict, skip it
-            for item in data[1:]:
+            # httpx auto-decompresses — if still bytes, decode manually
+            try:
+                data = resp.json()
+            except Exception:
+                import gzip, json
+                data = json.loads(gzip.decompress(resp.content))
+
+            for item in data[1:]:  # first item is legal notice
                 if not isinstance(item, dict):
                     continue
 
-                tags = item.get("tags", [])
                 company = item.get("company", "")
-                title = item.get("position", "")
+                title   = item.get("position", "")
                 location = item.get("location", "Remote") or "Remote"
 
                 posted_at = None

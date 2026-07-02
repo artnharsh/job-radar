@@ -31,6 +31,7 @@ class Settings(BaseSettings):
 
     # Telegram
     telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
 
     # External APIs
     adzuna_app_id: str = ""

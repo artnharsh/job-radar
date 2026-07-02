@@ -8,17 +8,21 @@ Handles:
   - trust_score assignment from source
   - Bulk insert for performance
   - source_health update on success/failure
+  - Watchlist check + Telegram alert on new inserts (Day 5)
 """
 
+import asyncio
 from datetime import datetime, timezone
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database.models import Job, Source
+from app.database.models import Job, Source, Watchlist
 from app.schemas.job import JobCreate
 from app.services import source_health_service
+from app.services.telegram_service import send_watchlist_alert
+from app.services.source_selector_service import DEFAULT_USER_ID
 from app.utils.hashing import make_job_hash
 from app.utils.logger import get_logger
 
@@ -61,6 +65,16 @@ async def ingest_jobs(
     skipped = 0
     now = datetime.now(timezone.utc)
 
+    # Load watchlist once per batch — case-insensitive company names
+    watchlist_result = await db.execute(
+        select(Watchlist.company_name).where(Watchlist.user_id == DEFAULT_USER_ID)
+    )
+    watched_companies: set[str] = {
+        row[0].lower().strip() for row in watchlist_result.all()
+    }
+
+    newly_inserted: list[JobCreate] = []  # track new jobs for watchlist check
+
     for job in jobs:
         # Ensure hash is set (collectors set it but defensive check)
         if not job.job_hash:
@@ -101,16 +115,44 @@ async def ingest_jobs(
         # rowcount=1 means inserted, 0 means conflict (duplicate updated)
         if result.rowcount == 1:
             inserted += 1
+            newly_inserted.append(job)
         else:
             skipped += 1
 
+    # ── Watchlist alerts — fire AFTER commit so DB is consistent ──
+    # Collect alerts to fire after commit (non-blocking)
+    alerts_to_fire = []
+    for job in newly_inserted:
+        company_lower = job.company.lower().strip()
+        for watched in watched_companies:
+            if watched in company_lower or company_lower in watched:
+                alerts_to_fire.append(job)
+                log.info(
+                    "watchlist_hit",
+                    company=job.company,
+                    title=job.title,
+                )
+                break
+
     await db.commit()
+
+    # Fire Telegram alerts after commit — non-blocking
+    for job in alerts_to_fire:
+        asyncio.create_task(
+            send_watchlist_alert(
+                company=job.company,
+                title=job.title,
+                url=job.url,
+                location=job.location,
+            )
+        )
 
     log.info(
         "ingestion_complete",
         source=source_name,
         inserted=inserted,
         skipped=skipped,
+        alerts_fired=len(alerts_to_fire),
     )
 
     return {
@@ -118,4 +160,5 @@ async def ingest_jobs(
         "skipped": skipped,
         "source": source_name,
         "status": "ok",
+        "alerts_fired": len(alerts_to_fire),
     }

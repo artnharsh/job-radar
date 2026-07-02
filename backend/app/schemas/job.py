@@ -9,7 +9,7 @@ class JobBase(BaseModel):
     location: str | None = None
     url: str
     description: str | None = None
-    source_name: str = ""          # set by ingestion service, not collectors
+    source_name: str = ""
     source_type: str = "api"
     job_type: str | None = None
     experience_level: str | None = None
@@ -21,7 +21,7 @@ class JobBase(BaseModel):
 
 
 class JobCreate(JobBase):
-    job_hash: str = ""             # computed if empty
+    job_hash: str = ""
     trust_score: float = 0.5
     posted_at: datetime | None = None
 
@@ -37,6 +37,31 @@ class JobRead(JobBase):
     model_config = {"from_attributes": True}
 
 
+class JobReadWithMeta(JobRead):
+    """
+    Extended job response — includes computed fields
+    that are not stored in the database.
+    """
+    freshness_score: float = 0.5
+    is_viewed: bool = False
+
+
+class JobReadWithScore(JobReadWithMeta):
+    """
+    Match-scored job response — Day 5.
+    Extends JobReadWithMeta with match engine output.
+    """
+    match_score: float = 0.5
+    skill_gap: list[str] = []
+    priority_score: float = 0.5
+
+
 class JobListResponse(BaseModel):
     total: int
-    jobs: list[JobRead]
+    jobs: list[JobReadWithMeta]
+
+
+class HighMatchResponse(BaseModel):
+    """Response for GET /jobs/high-match — Day 5."""
+    user_skill_count: int
+    jobs: list[JobReadWithScore]

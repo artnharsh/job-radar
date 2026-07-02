@@ -1,6 +1,7 @@
 import asyncio
 from contextlib import asynccontextmanager
 
+# pyrefly: ignore [missing-import]
 import redis.asyncio as aioredis
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -8,6 +9,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api import health
 from app.api import jobs
 from app.api import source
+from app.api import skills
+from app.api import watchlist
 from app.scheduler.job_scheduler import (
     start_scheduler,
     run_tier1_collectors,
@@ -61,9 +64,9 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(jobs.router)
-app.include_router(health.router)
-app.include_router(jobs.router)
 app.include_router(source.router)
+app.include_router(skills.router)
+app.include_router(watchlist.router)
 
 
 @app.get("/")
